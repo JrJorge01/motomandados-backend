@@ -6,16 +6,52 @@
 
 <title>Motomandados</title>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
 <style>
 body{
   font-family: Arial;
-  background:#f5f5f5;
+  margin:0;
   padding:10px;
+  background:#f5f5f5;
+}
+
+.container{
+  max-width:700px;
+  margin:auto;
+}
+
+input, textarea{
+  width:100%;
+  padding:12px;
+  margin-bottom:10px;
+  font-size:16px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+button{
+  width:100%;
+  padding:10px;
+  margin-bottom:5px;
+  font-size:14px;
+  border:none;
+  border-radius:8px;
+  background:#007bff;
+  color:white;
+}
+
+#map{
+  width:100%;
+  height:300px;
+  border-radius:10px;
 }
 </style>
 </head>
 
 <body>
+
+<div class="container">
 
 <h2>Login</h2>
 
@@ -27,27 +63,62 @@ body{
 
 <hr>
 
+<!-- CLIENTE -->
 <div id="app" style="display:none;">
+
   <h2>Enviar pedido</h2>
-  <textarea id="mensaje"></textarea>
+
+  <textarea id="mensaje" placeholder="¿Qué necesitas?"></textarea>
+
+  <h3>Ubicación</h3>
+  <div id="map"></div>
+
+  <p>Lat: <span id="lat"></span></p>
+  <p>Lng: <span id="lng"></span></p>
+
+  <input type="text" id="direccion" placeholder="Dirección">
+  <input type="tel" id="telefono" placeholder="Teléfono">
+
   <button onclick="enviar()">Enviar</button>
+
+  <h3>Estado</h3>
+  <div id="estadoCliente"></div>
+
 </div>
 
+<!-- ADMIN -->
 <div id="adminPanel" style="display:none;">
-  <h2>Pedidos</h2>
+  <h3>Pedidos</h3>
   <ul id="lista"></ul>
 </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
 
 let usuarioActual="";
+let mapa, marcador;
+let lat=21.1;
+let lng=-104.43;
+
+// ICONOS ESTADO 🔥
+function iconoEstado(status){
+  if(status==="pendiente") return "⏳";
+  if(status==="aceptado") return "✅";
+  if(status==="en camino") return "🚴";
+  if(status==="entregado") return "📦";
+  if(status==="cancelado") return "❌";
+  return "";
+}
 
 // LOGIN
 function login(){
   fetch('https://motomandados-backend-sa3n.onrender.com/login',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
+    body: JSON.stringify({
       user:user.value,
       pass:pass.value
     })
@@ -66,6 +137,10 @@ function login(){
         cargarPedidos();
       }else{
         app.style.display='block';
+        iniciarMapa();
+
+        verEstadoCliente();
+        setInterval(verEstadoCliente,3000);
       }
 
     }else{
@@ -75,12 +150,12 @@ function login(){
   });
 }
 
-// REGISTRAR
+// REGISTRO
 function registrar(){
   fetch('https://motomandados-backend-sa3n.onrender.com/register',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
+    body: JSON.stringify({
       user:user.value,
       pass:pass.value
     })
@@ -89,46 +164,99 @@ function registrar(){
   .then(d=>alert(d.ok?"Registrado":"Error"));
 }
 
+// MAPA CON CALLES ✅
+function iniciarMapa(){
+
+  if(mapa){
+    mapa.remove();
+  }
+
+  mapa=L.map('map',{maxZoom:20}).setView([lat,lng],18);
+
+  // SATELITE
+  L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+  ).addTo(mapa);
+
+  // CALLES (NOMBRES)
+  L.tileLayer(
+    'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
+  ).addTo(mapa);
+
+  marcador=L.marker([lat,lng],{draggable:true}).addTo(mapa);
+
+  actualizar();
+
+  marcador.on('dragend',()=>{
+    const pos=marcador.getLatLng();
+    lat=pos.lat;
+    lng=pos.lng;
+    actualizar();
+  });
+
+  setTimeout(()=>mapa.invalidateSize(),200);
+}
+
+function actualizar(){
+  document.getElementById('lat').innerText=lat;
+  document.getElementById('lng').innerText=lng;
+}
+
 // ENVIAR
 function enviar(){
+
+  const mensaje = document.getElementById('mensaje').value;
+  const direccion = document.getElementById('direccion').value;
+  const telefono = document.getElementById('telefono').value;
+
+  if(!mensaje || !direccion || !telefono){
+    alert("Completa todo");
+    return;
+  }
+
   fetch('https://motomandados-backend-sa3n.onrender.com/mensaje',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      mensaje:mensaje.value,
+    body: JSON.stringify({
+      mensaje,
       user:usuarioActual,
-      lat:0,
-      lng:0,
-      direccion:"-",
-      telefono:"-"
+      lat,
+      lng,
+      direccion,
+      telefono
     })
   })
-  .then(()=>alert("Pedido enviado"));
+  .then(()=>alert("Pedido enviado ✅"));
 }
 
-// LISTAR PEDIDOS ✅ (CON VER EN MAPA COMO ANTES)
+// ADMIN
 function cargarPedidos(){
 
   fetch('https://motomandados-backend-sa3n.onrender.com/pedidos')
   .then(r=>r.json())
   .then(data=>{
 
-    lista.innerHTML="";
+   li.innerHTML=`
+  <b>${p.user}</b>: ${p.mensaje}<br>
 
-    data.forEach(p=>{
+  📍 ${p.direccion}<br>
+  📞 ${p.telefono}<br>
 
-      const li = document.createElement('li');
+  <a href="tel:${p.telefono}">📞 Llamar</a><br>
 
-      li.innerHTML = `
-        ${p.user}: ${p.mensaje} <br>
-        📍 (${p.lat}, ${p.lng}) <br>
+  <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank">
+    📍 Ver ubicación
+  </a><br>
 
-        <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank">
-          Ver en mapa
-        </a>
+  <b>${icono} ${p.status}</b><br>
 
-        <hr>
-      `;
+  <button onclick="cambiarEstado(${i},'aceptado')">Aceptar</button>
+  <button onclick="cambiarEstado(${i},'en camino')">En camino</button>
+  <button onclick="cambiarEstado(${i},'entregado')">Entregado</button>
+  <button onclick="cambiarEstado(${i},'cancelado')">Cancelar</button>
+
+  <hr>
+`;
 
       lista.appendChild(li);
     });
@@ -136,6 +264,42 @@ function cargarPedidos(){
   });
 }
 
+// CAMBIAR ESTADO
+function cambiarEstado(index, status){
+
+  fetch('https://motomandados-backend-sa3n.onrender.com/estatus',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ index, status })
+  })
+  .then(()=>cargarPedidos());
+}
+
+function verEstadoCliente(){
+
+  fetch('https://motomandados-backend-sa3n.onrender.com/pedidos')
+  .then(r=>r.json())
+  .then(data=>{
+
+    // 🔥 todos los pedidos del usuario
+    const pedidosUsuario = data.filter(p => p.user === usuarioActual);
+
+    estadoCliente.innerHTML = "";
+
+    pedidosUsuario.forEach(p => {
+
+      const icono = iconoEstado(p.status);
+
+      estadoCliente.innerHTML += `
+        <div style="background:white; padding:10px; border-radius:10px; margin-bottom:10px;">
+          <b>${icono} ${p.status}</b><br>
+          🧾 ${p.mensaje}
+        </div>
+      `;
+    });
+
+  });
+}
 </script>
 
 </body>
