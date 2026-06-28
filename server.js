@@ -26,7 +26,31 @@ function saveUsers(data) {
 let users = loadUsers();
 
 let pedidos = [];
+let onlineUsers = {};
 
+app.post('/heartbeat', (req, res) => {
+    const { user } = req.body;
+
+    if (user) {
+        onlineUsers[user] = Date.now();
+    }
+
+    res.json({ ok: true });
+});
+
+app.get('/online', (req, res) => {
+
+    const now = Date.now();
+    const activos = {};
+
+    for (let u in onlineUsers) {
+        if (now - onlineUsers[u] < 10000) { // 10 segundos
+            activos[u] = true;
+        }
+    }
+
+    res.json(activos);
+});
 // REGISTRO
 app.post('/register', (req, res) => {
     let { user, pass } = req.body;
