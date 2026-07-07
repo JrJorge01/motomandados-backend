@@ -1,8 +1,59 @@
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 const app = express();
+
+//mongoose.connect(
+//    "mongodb+srv://rappyranch:SBWoa5oZFs6uHfBN@rappyranch.hfg15il.mongodb.net/?appName=RappyRanch"
+//)
+
+//    .then(() => {
+//        console.log("✅ MongoDB conectado");
+//    })
+//    .catch(err => {
+//        console.error("❌ Error Mongo:", err);
+//    });
+
+mongoose.connect(
+    "mongodb://rappyranch:SBWoa5oZFs6uHfBN@ac-4nsdvgw-shard-00-00.hfg15il.mongodb.net:27017,ac-4nsdvgw-shard-00-01.hfg15il.mongodb.net:27017,ac-4nsdvgw-shard-00-02.hfg15il.mongodb.net:27017/?ssl=true&replicaSet=atlas-orqof7-shard-0&authSource=admin&appName=RappyRanch"
+)
+    .then(() => {
+        console.log("✅ MongoDB conectado");
+    })
+    .catch(err => {
+        console.error("❌ Error Mongo:", err);
+    });
+
+const UserSchema = new mongoose.Schema({
+    user: String,
+    pass: String,
+    role: String
+});
+const User = mongoose.model('User', UserSchema);
+
+async function crearAdmin() {
+
+    const existe = await User.findOne({
+        user: "admin"
+    });
+
+    if (!existe) {
+
+        await User.create({
+            user: "admin",
+            pass: "1234",
+            role: "admin"
+        });
+
+        console.log("✅ Admin creado");
+    }
+}
+
+
+crearAdmin();
+
 
 app.use(cors());
 app.use(express.json());
@@ -52,43 +103,57 @@ app.get('/online', (req, res) => {
     res.json(activos);
 });
 // REGISTRO
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
+
     let { user, pass } = req.body;
 
-    if (!user || !pass) return res.json({ ok: false });
+    if (!user || !pass)
+        return res.json({ ok: false });
 
     user = user.toLowerCase().trim();
     pass = pass.trim();
 
-    if (user === "admin") return res.json({ ok: false });
+    if (user === "admin")
+        return res.json({ ok: false });
 
-    const existe = users.find(u => u.user === user);
+    const existe = await User.findOne({
+        user
+    });
 
-    if (existe) return res.json({ ok: false });
+    if (existe)
+        return res.json({ ok: false });
 
-    users.push({ user, pass, role: "cliente" });
-
-    saveUsers(users); // 🔥 GUARDAR
+    await User.create({
+        user,
+        pass,
+        role: "cliente"
+    });
 
     res.json({ ok: true });
 });
 
 // LOGIN
-app.post('/login', (req, res) => {
+// LOGIN
+app.post('/login', async (req, res) => {
+
     let { user, pass } = req.body;
 
     user = user.toLowerCase().trim();
     pass = pass.trim();
 
-    const encontrado = users.find(
-        u => u.user === user && u.pass === pass
-    );
+    const encontrado = await User.findOne({
+        user,
+        pass
+    });
 
-    if (!encontrado) return res.json({ ok: false });
+    if (!encontrado)
+        return res.json({ ok: false });
 
-    res.json({ ok: true, role: encontrado.role });
+    res.json({
+        ok: true,
+        role: encontrado.role
+    });
 });
-
 // CREAR PEDIDO
 app.post('/mensaje', (req, res) => {
     let { mensaje, user, lat, lng, direccion, telefono } = req.body;
@@ -137,9 +202,14 @@ app.post('/ubicacion', (req, res) => {
 
 
 // VER USUARIOS (solo admin lo debería usar)
-app.get('/usuarios', (req, res) => {
-    res.json(users);
+
+app.get('/usuarios', async (req, res) => {
+
+    const usuarios = await User.find();
+
+    res.json(usuarios);
 });
+
 
 
 const PORT = process.env.PORT || 3000;
