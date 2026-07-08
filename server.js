@@ -5,19 +5,8 @@ const mongoose = require('mongoose');
 
 const app = express();
 
-//mongoose.connect(
-//    "mongodb+srv://rappyranch:SBWoa5oZFs6uHfBN@rappyranch.hfg15il.mongodb.net/?appName=RappyRanch"
-//)
-
-//    .then(() => {
-//        console.log("✅ MongoDB conectado");
-//    })
-//    .catch(err => {
-//        console.error("❌ Error Mongo:", err);
-//    });
-
 mongoose.connect(
-    "mongodb://rappyranch:SBWoa5oZFs6uHfBN@ac-4nsdvgw-shard-00-00.hfg15il.mongodb.net:27017,ac-4nsdvgw-shard-00-01.hfg15il.mongodb.net:27017,ac-4nsdvgw-shard-00-02.hfg15il.mongodb.net:27017/?ssl=true&replicaSet=atlas-orqof7-shard-0&authSource=admin&appName=RappyRanch"
+"mongodb://rappyranch:SBWoa5oZFs6uHfBN@ac-4nsdvgw-shard-00-00.hfg15il.mongodb.net:27017,ac-4nsdvgw-shard-00-01.hfg15il.mongodb.net:27017,ac-4nsdvgw-shard-00-02.hfg15il.mongodb.net:27017/?ssl=true&replicaSet=atlas-orqof7-shard-0&authSource=admin&appName=RappyRanch"
 )
     .then(() => {
         console.log("✅ MongoDB conectado");
@@ -210,6 +199,10 @@ app.get('/usuarios', async (req, res) => {
     res.json(usuarios);
 });
 
+
+app.get('/version', (req, res) => {
+    res.send("Mongo Version 1");
+});
 
 
 const PORT = process.env.PORT || 3000;
